@@ -1,0 +1,28 @@
+# Local/private app data
+backup/
+backups/
+*.backup.json
+*.backup
+*.local.json
+*.local.js
+
+# Browser/app exports and generated data
+exports/
+data/
+*.csv
+*.xlsx
+
+# Local development files
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# Editor / OS files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+*.log

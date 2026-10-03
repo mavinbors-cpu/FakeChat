@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b12">
+  <title>Fake Dating</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="brand">Chat&<span>Meet</span></div>
+      </div>
+      <button id="notifyBtn" class="icon-btn" title="Notifications" aria-label="Notifications">🔔<span id="notifDot" class="notif-dot hidden"></span></button>
+    </header>
+
+    <main id="main">
+      <section id="discoverView" class="view active">
+        <div class="section-head discover-head">
+          <div>
+            <h1>Discover</h1>
+            <p>Find someone new and see where the conversation goes.</p>
+          </div>
+        </div>
+        <div id="cardArea" class="card-area"></div>
+        <div class="swipe-actions">
+          <button id="passBtn" class="round-action pass" aria-label="Pass">✕</button>
+          <button id="likeBtn" class="round-action like" aria-label="Like">♥</button>
+        </div>
+      </section>
+
+      <section id="matchesView" class="view">
+        <div class="section-head"><div><h1>Liked You</h1><p>People who liked your profile</p></div></div>
+        <div id="matchesList" class="list"></div>
+      </section>
+
+      <section id="chatsView" class="view">
+        <div class="section-head"><div><h1>Chats</h1><p>Automatic replies are simulated</p></div></div>
+        <div id="chatList" class="list"></div>
+      </section>
+
+      <section id="manageView" class="view">
+        <div class="section-head"><div><h1>Profile</h1><p>Profiles, conversations and app data</p></div></div>
+        <div class="manage-grid">
+          <button class="manage-card" data-panel="profiles">👤<b>Dating Profiles</b><span>Manage your profiles</span></button>
+          <button class="manage-card" data-panel="replies">💬<b>Conversation Replies</b><span>Manage their responses</span></button>
+          <button class="manage-card" data-panel="data">💾<b>App Data</b><span>Backup and storage</span></button>
+        </div>
+        <div id="managePanel" class="panel hidden"></div>
+      </section>
+
+      <section id="notificationsView" class="view">
+        <div class="section-head"><div><h1>Notifications</h1><p>In-app notifications only</p></div><button id="clearNotifications" class="small-btn">Clear</button></div>
+        <div id="notificationsList" class="list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button data-view="discoverView" class="nav-item active">🔥<span>Discover</span></button>
+      <button data-view="matchesView" class="nav-item">💚<span>Liked You</span></button>
+      <button data-view="chatsView" class="nav-item">💬<span>Chats</span></button>
+      <button data-view="manageView" class="nav-item">⚙️<span>Profile</span></button>
+    </nav>
+  </div>
+
+  <div id="editMessageModal" class="modal hidden">
+    <div class="modal-box edit-message-box">
+      <div class="modal-head"><h2>Edit Message</h2><button id="closeEditMessage" class="icon-btn" aria-label="Close">✕</button></div>
+      <form id="editMessageForm">
+        <textarea id="editMessageText" required></textarea>
+        <div class="form-actions"><button type="button" class="small-btn" id="cancelEditMessage">Cancel</button><button type="submit" class="primary">Save</button></div>
+      </form>
+    </div>
+  </div>
+
+<div id="chatModal" class="modal hidden">
+    <div class="modal-box chat-box">
+      <div class="modal-head">
+        <button id="closeChat" class="icon-btn">←</button>
+        <div id="chatHeader" class="chat-header"></div>
+      </div>
+      <div id="messages" class="messages"></div>
+      <div class="typing hidden" id="typing">typing…</div>
+      <form id="messageForm" class="message-form">
+        <input id="messageInput" autocomplete="off" placeholder="Type a message…">
+        <button>➤</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="detailsModal" class="modal hidden">
+    <div class="modal-box profile-details-box">
+      <div class="modal-head">
+        <h2>Profile Details</h2>
+        <button id="closeDetailsTop" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="detailsContent"></div>
+    </div>
+  </div>
+
+  <div id="profileModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head"><h2>Edit Fake Profile</h2><button id="closeProfile" class="icon-btn">✕</button></div>
+      <form id="profileForm" class="form"></form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
