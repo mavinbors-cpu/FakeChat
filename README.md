@@ -37,3 +37,9 @@ Uploaded profile photos are stored in IndexedDB instead of localStorage, prevent
 
 ### Discover profile details
 Click a profile to open a scrollable profile view with About, Lifestyle, Interests, and notes for each photo. These fields can be edited from Dating Profiles.
+
+### Chat v37 additions
+- Non-interactive simulated call/video icons in the chat header.
+- Long-press a message to add or toggle a ❤️, 😡, or 😂 reaction.
+- Chat list shows the most recent chat time, weekday, or date.
+- Attach an image from the chat composer; images are resized/compressed before being stored with local chat data.

@@ -80,10 +80,12 @@
       <div class="modal-head">
         <button id="closeChat" class="icon-btn">←</button>
         <div id="chatHeader" class="chat-header"></div>
+        <div class="chat-call-icons" aria-label="Simulated call controls"><span title="Video call unavailable" aria-disabled="true">▣</span><span title="Call unavailable" aria-disabled="true">☎</span></div>
       </div>
       <div id="messages" class="messages"></div>
       <div class="typing hidden" id="typing">typing…</div>
       <form id="messageForm" class="message-form">
+        <label class="attach-image-btn" title="Attach image" aria-label="Attach image">＋<input id="imageAttachment" type="file" accept="image/*" hidden></label>
         <textarea id="messageInput" rows="1" autocomplete="off" placeholder="Type a message…" aria-label="Type a message"></textarea>
         <button>➤</button>
       </form>

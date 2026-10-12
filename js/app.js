@@ -123,6 +123,8 @@ function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 function profile(id){return data.profiles.find(p=>p.id===id)}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function time(){return new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
+function messageDate(m){if(m.timestamp)return new Date(m.timestamp);if(m.date)return new Date(m.date);return null}
+function lastChatLabel(messages){if(!messages?.length)return "";const m=messages[messages.length-1],d=messageDate(m);if(!d||Number.isNaN(d.getTime()))return m.time||"";const now=new Date(),same=d.toDateString()===now.toDateString();const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);if(same)return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});if(d.toDateString()===yesterday.toDateString())return "Yesterday";const days=(now-d)/86400000;if(days<7)return d.toLocaleDateString([], {weekday:"short",hour:"2-digit",minute:"2-digit"});return d.toLocaleDateString([], {month:"short",day:"numeric",year:"numeric"})}
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),2200)}
 let notificationAudioContext=null;
 let replyAudio=null;
@@ -248,11 +250,12 @@ function renderMatches(){
  if(!data.matches.length){e.innerHTML='<div class="empty">No matches yet. Like a profile to create a simulated match.</div>';return}
  e.innerHTML=data.matches.map(id=>{const p=profile(id);return `<div class="list-item" data-view-profile="${p.id}" role="button" tabindex="0"><img class="avatar" src="${esc(imageSrc(p.images?.[0]||p.image)||"images/alex.svg")}" alt="${esc(p.name)}"><div class="item-main"><b>${esc(p.name)}, ${p.age}</b><span>${esc(p.bio)}</span></div><button class="open-btn" data-chat="${p.id}">Chat</button></div>`}).join("");
 }
-function lastMessage(id){const c=chatFor(id);return c.length?c[c.length-1].text:"Start the conversation…"}
+function lastMessage(id){const c=chatFor(id);if(!c.length)return "Start the conversation…";const m=c[c.length-1];return m.image?"📷 Photo":(m.text||"Attachment")}
+function messageStamp(){const d=new Date();return {time:time(),timestamp:d.toISOString()}}
 function renderChats(){
  const e=document.getElementById("chatList");
  if(!data.matches.length){e.innerHTML='<div class="empty">Your matched chats will appear here.</div>';updateChatsNavBadge();return}
- e.innerHTML=data.matches.map(id=>{const p=profile(id),unread=unreadCount(id);return `<div class="list-item chat-list-item"><img class="avatar" src="${imageSrc(p.images?.[0]||p.image)}"><div class="item-main"><b>${esc(p.name)}</b><span>${esc(lastMessage(id))}</span></div>${unread?`<span class="unread-count" aria-label="${unread} unread messages">${unread>99?"99+":unread}</span>`:""}<button class="open-btn" data-chat="${p.id}">Open</button></div>`}).join("");
+ e.innerHTML=data.matches.map(id=>{const p=profile(id),unread=unreadCount(id);return `<div class="list-item chat-list-item"><img class="avatar" src="${imageSrc(p.images?.[0]||p.image)}"><div class="item-main"><b>${esc(p.name)} <small class="chat-last-time">${esc(lastChatLabel(chatFor(id)))}</small></b><span>${esc(lastMessage(id))}</span></div>${unread?`<span class="unread-count" aria-label="${unread} unread messages">${unread>99?"99+":unread}</span>`:""}<button class="open-btn" data-chat="${p.id}">Open</button></div>`}).join("");
  updateChatsNavBadge();
 }
 function renderNotifications(){
@@ -268,7 +271,7 @@ function openChat(id){
 }
 function renderMessages(){
  const e=document.getElementById("messages"),c=chatFor(activeChat);
- e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}"><div class="bubble-content">${esc(m.text)}</div>${m.from==="me"&&m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time)}</small><button type="button" class="message-edit-btn" data-edit-chat-message="${i}" aria-label="Edit message" title="Edit message">✎</button></div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
+ e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}"><div class="bubble-content">${m.image?`<img class="chat-attachment" src="${esc(m.image)}" alt="Attached image" loading="lazy">`:""}${m.text?`<div>${esc(m.text)}</div>`:""}</div>${m.reaction?`<span class="message-reaction">${m.reaction}</span>`:""}${m.from==="me"&&m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time||"")}</small><button type="button" class="message-edit-btn" data-edit-chat-message="${i}" aria-label="Edit message" title="Edit message">✎</button></div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
  e.scrollTop=e.scrollHeight;
  setupMessageEditing();
 }
@@ -291,17 +294,6 @@ function setupMessageEditing(){
  const area=document.getElementById("messages");
  if(!area || area.dataset.editReady)return;
  area.dataset.editReady="1";
- area.addEventListener("pointerdown",e=>{
-   const msg=e.target.closest("[data-message-index]");
-   if(!msg || msg.dataset.messageFrom!=="me")return;
-   editMessageMoved=false;
-   clearTimeout(editMessageTimer);
-   const index=Number(msg.dataset.messageIndex);
-   editMessageTimer=setTimeout(()=>{if(!editMessageMoved)openEditMessage(index)},550);
- });
- area.addEventListener("pointermove",()=>{editMessageMoved=true;clearTimeout(editMessageTimer)});
- area.addEventListener("pointerup",()=>clearTimeout(editMessageTimer));
- area.addEventListener("pointercancel",()=>clearTimeout(editMessageTimer));
  area.addEventListener("contextmenu",e=>{
    const msg=e.target.closest("[data-message-index]");
    if(msg && msg.dataset.messageFrom==="me"){
@@ -358,7 +350,7 @@ function autoReply(text){
    const target=profile(targetId);
    if(!target)return;
    const chatIsOpen=activeChat===targetId&&!document.getElementById("chatModal").classList.contains("hidden");
-   chatFor(targetId).push({from:"them",text:reply,time:time(),read:chatIsOpen});
+   chatFor(targetId).push({from:"them",text:reply,...messageStamp(),read:chatIsOpen});
    addNotif(`${target.name} replied to your message`);
    playReplySound();
    save();
@@ -371,8 +363,12 @@ function autoReply(text){
 }
 function sendMessage(){
  const input=document.getElementById("messageInput"),text=input.value.trim();if(!text||!activeChat)return;
- chatFor(activeChat).push({from:"me",text,time:time()});input.value="";save();renderMessages();renderChats();autoReply(text);
+ chatFor(activeChat).push({from:"me",text,...messageStamp()});input.value="";save();renderMessages();renderChats();autoReply(text);
 }
+async function sendImage(file){if(!file||!activeChat)return;if(!file.type.startsWith("image/")){toast("Please choose an image");return;}if(file.size>12*1024*1024){toast("Choose an image under 12 MB");return;}try{const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",0.78));};img.onerror=reject;img.src=r.result;};r.onerror=reject;r.readAsDataURL(file)});chatFor(activeChat).push({from:"me",text:"",image:dataUrl,...messageStamp()});save();renderMessages();renderChats();toast("Image sent");}catch{toast("Could not attach that image");}}
+function setReaction(index,reaction){const msg=chatFor(activeChat)[index];if(!msg)return;msg.reaction=msg.reaction===reaction?"":reaction;save();renderMessages();renderChats();}
+function setupReactions(){const area=document.getElementById("messages");if(!area||area.dataset.reactionReady)return;area.dataset.reactionReady="1";let timer=null,moved=false,target=null;area.addEventListener("pointerdown",e=>{target=e.target.closest("[data-message-index]");if(!target)return;moved=false;clearTimeout(timer);timer=setTimeout(()=>{if(!moved&&target){const idx=Number(target.dataset.messageIndex);showReactionPicker(target,idx)}},520);});area.addEventListener("pointermove",()=>{moved=true;clearTimeout(timer)});["pointerup","pointercancel","scroll"].forEach(ev=>area.addEventListener(ev,()=>clearTimeout(timer)));area.addEventListener("contextmenu",e=>{const b=e.target.closest("[data-message-index]");if(b){e.preventDefault();showReactionPicker(b,Number(b.dataset.messageIndex))}});}
+function showReactionPicker(bubble,index){document.querySelectorAll(".reaction-picker").forEach(x=>x.remove());const picker=document.createElement("div");picker.className="reaction-picker";picker.innerHTML=`<button type="button" data-reaction="❤️" aria-label="Heart">❤️</button><button type="button" data-reaction="😡" aria-label="Mad">😡</button><button type="button" data-reaction="😂" aria-label="Laugh">😂</button>`;bubble.appendChild(picker);picker.addEventListener("click",e=>{const btn=e.target.closest("[data-reaction]");if(btn)setReaction(index,btn.dataset.reaction)});setTimeout(()=>{if(picker.isConnected)picker.remove()},4000);}
 function showView(id){
  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));document.getElementById(id).classList.add("active");
  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view===id));
@@ -747,6 +743,8 @@ document.addEventListener("keydown",e=>{
 const messageInputEl=document.getElementById("messageInput");
 messageInputEl.addEventListener("input",()=>{messageInputEl.style.height="auto";messageInputEl.style.height=Math.min(messageInputEl.scrollHeight,140)+"px";});
 document.getElementById("messageForm").onsubmit=e=>{e.preventDefault();sendMessage();messageInputEl.style.height="auto"};
+document.getElementById("imageAttachment")?.addEventListener("change",e=>{const file=e.target.files?.[0];if(file)sendImage(file);e.target.value=""});
+setupReactions();
 
 document.querySelectorAll(".manage-card").forEach(b=>b.onclick=()=>{if(b.dataset.panel==="profiles")renderProfilesPanel();if(b.dataset.panel==="replies")renderRepliesPanel();if(b.dataset.panel==="data")renderDataPanel()});
 document.addEventListener("click",e=>{
