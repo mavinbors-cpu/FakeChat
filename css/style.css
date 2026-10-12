@@ -256,3 +256,30 @@ main{
 .inline-edit-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px}
 .inline-edit-actions button{padding:5px 9px;border-radius:7px;font-size:11px;background:#303244;color:#eee}
 .inline-edit-actions .inline-save{background:#ff4f91;color:white}
+
+/* v34: compact conversation layout so the messages stay in focus */
+#chatModal .messages{padding:10px 12px;gap:5px}
+#chatModal .bubble{padding:8px 11px;line-height:1.28;border-radius:15px}
+#chatModal .bubble small{margin-top:3px;line-height:1.15}
+#chatModal .message-edit-btn{margin-top:1px;height:14px;line-height:14px}
+@media(max-width:650px){
+  #chatModal .messages{padding:8px 9px;gap:4px}
+  #chatModal .bubble{max-width:90%;padding:8px 10px;line-height:1.27}
+  #chatModal .bubble small{margin-top:2px}
+  #chatModal .message-edit-btn{margin-top:0}
+}
+
+
+/* v35: tighten message bubbles and keep the pencil from adding an empty row */
+#chatModal .messages{gap:3px;padding:7px 9px}
+#chatModal .bubble{position:relative;padding:6px 9px 7px;line-height:1.24;border-radius:13px}
+#chatModal .bubble small{margin-top:2px;line-height:1.1;padding-right:20px}
+#chatModal .message-edit-btn{position:absolute;right:6px;bottom:4px;margin:0;width:16px;height:13px;line-height:13px;font-size:11px}
+#chatModal .edited-label{margin-left:0;margin-top:2px;font-size:9px}
+#chatModal .inline-message-editor{margin:2px 0 4px}
+@media(max-width:650px){
+  #chatModal .messages{gap:2px;padding:6px 7px}
+  #chatModal .bubble{max-width:92%;padding:6px 8px 7px;line-height:1.22}
+  #chatModal .bubble small{margin-top:2px}
+  #chatModal .message-edit-btn{right:5px;bottom:3px}
+}
