@@ -283,3 +283,13 @@ main{
   #chatModal .bubble small{margin-top:2px}
   #chatModal .message-edit-btn{right:5px;bottom:3px}
 }
+
+
+/* v36: keep the profile name/photo header fixed while only messages scroll */
+#chatModal .chat-box{position:relative;overflow:hidden;min-height:0}
+#chatModal .modal-head{position:relative;top:auto;z-index:4;flex:0 0 auto;flex-shrink:0;background:#1a1b16;border-bottom:1px solid #292b39}
+#chatModal .chat-header{flex-shrink:0}
+#chatModal .chat-header img{flex-shrink:0}
+#chatModal .messages{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain; -webkit-overflow-scrolling:touch}
+#chatModal .typing{flex:0 0 auto}
+#chatModal .message-form{flex-shrink:0}
