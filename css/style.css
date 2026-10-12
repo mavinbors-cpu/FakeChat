@@ -222,3 +222,24 @@ main{
 .fix-reply-btn:hover,.fix-reply-btn:focus-visible{opacity:1;color:#ffcf45;background:rgba(255,204,51,.10);outline:none}
 @media (hover:hover){.fix-reply-btn{opacity:0}.bubble.them:hover .fix-reply-btn,.bubble.them:focus-within .fix-reply-btn{opacity:.65}}
 @media (hover:none){.fix-reply-btn{opacity:.35;width:20px;height:18px;font-size:12px}}
+
+
+/* v29 chat layout stabilization */
+#chatModal{align-items:center;justify-content:center;overflow:hidden}
+#chatModal .chat-box{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+#chatModal .modal-head{flex:0 0 auto;min-width:0}
+#chatModal .chat-header{flex:1;min-width:0;overflow:hidden}
+#chatModal .chat-header>*{min-width:0}
+#chatModal .messages{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;align-items:stretch}
+#chatModal .bubble{width:fit-content;max-width:min(82%,520px);min-width:0;box-sizing:border-box}
+#chatModal .message-form{flex:0 0 auto;display:flex;align-items:flex-end;gap:8px;width:100%;min-width:0;padding:10px;box-sizing:border-box;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+#chatModal #messageInput{display:block;flex:1 1 0;width:0;min-width:0;max-width:100%;height:auto;max-height:140px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box;line-height:1.4}
+#chatModal .message-form button{flex:0 0 46px;width:46px;height:46px;min-width:46px;padding:0;display:flex;align-items:center;justify-content:center}
+@media(max-width:650px){
+  #chatModal{padding:0;align-items:stretch}
+  #chatModal .modal-box.chat-box{width:100%;height:100%;height:100dvh;max-height:100%;border-radius:0;padding:0;margin:0}
+  #chatModal .modal-head{padding-top:calc(10px + env(safe-area-inset-top));gap:10px}
+  #chatModal .messages{padding:12px;gap:8px}
+  #chatModal .bubble{max-width:88%;padding:10px 12px}
+  #chatModal .message-form{gap:7px;padding-left:9px;padding-right:9px}
+}

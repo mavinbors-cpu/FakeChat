@@ -136,24 +136,27 @@ function getReplyAudio(){
  }
  return replyAudio;
 }
-function unlockNotificationSound(){
+async function unlockNotificationSound(showFeedback=false){
  try{
    const AudioCtx=window.AudioContext||window.webkitAudioContext;
    if(AudioCtx){
      if(!notificationAudioContext)notificationAudioContext=new AudioCtx();
-     if(notificationAudioContext.state==="suspended")notificationAudioContext.resume().catch(()=>{});
+     if(notificationAudioContext.state==="suspended")await notificationAudioContext.resume();
    }
-   // iOS Safari requires audio playback to be initiated by a user gesture.
+   // Must be called directly from a user gesture on mobile/PWA.
    const audio=getReplyAudio();
-   if(!replyAudioUnlocked){
-     const previousMuted=audio.muted;
-     audio.muted=true;
-     const priming=audio.play();
-     if(priming&&typeof priming.then==="function"){
-       priming.then(()=>{audio.pause();audio.currentTime=0;audio.muted=previousMuted;replyAudioUnlocked=true;}).catch(()=>{audio.muted=previousMuted;});
-     }
+   audio.muted=true;
+   audio.currentTime=0;
+   await audio.play();
+   audio.pause();audio.currentTime=0;audio.muted=false;replyAudioUnlocked=true;
+   if(showFeedback){
+     audio.currentTime=0;
+     await audio.play();
+     toast("Notification sound enabled on this device");
    }
- }catch(e){}
+ }catch(e){
+   if(showFeedback)toast("Sound was blocked. Check phone silent mode and browser audio settings.");
+ }
 }
 function playReplySound(){
  try{
@@ -163,8 +166,9 @@ function playReplySound(){
    audio.play().catch(()=>{});
  }catch(e){}
 }
-document.addEventListener("pointerdown",unlockNotificationSound);
-document.addEventListener("keydown",unlockNotificationSound);
+document.addEventListener("pointerdown",()=>unlockNotificationSound(false),{once:true});
+document.addEventListener("keydown",()=>unlockNotificationSound(false),{once:true});
+document.getElementById("enableSound")?.addEventListener("click",()=>unlockNotificationSound(true));
 function addNotif(text){data.notifications.unshift({id:Date.now()+Math.random(),text,time:time(),read:false});save();renderNotifications();document.getElementById("notifDot").classList.remove("hidden")}
 function chatFor(id){if(!data.chats[id])data.chats[id]=[];return data.chats[id]}
 function unreadCount(id){return chatFor(id).filter(m=>m.from==="them"&&!m.read).length}
@@ -638,8 +642,53 @@ async function backup(){
    toast("Backup downloaded");
  }catch(e){console.error(e);toast("Backup failed")}
 }
+function mergeChatHistories(savedChats={}, currentChats={}){
+ const merged={};
+ const ids=new Set([...Object.keys(savedChats||{}),...Object.keys(currentChats||{})]);
+ for(const id of ids){
+   const saved=Array.isArray(savedChats?.[id])?savedChats[id]:[];
+   const current=Array.isArray(currentChats?.[id])?currentChats[id]:[];
+   const seen=new Set();
+   // Keep backup messages first, then preserve newer messages already in this browser.
+   merged[id]=[...saved,...current].filter(m=>{
+     const key=m?.id!=null?`id:${m.id}`:`fallback:${m?.from||""}|${m?.time||m?.timestamp||""}|${m?.text||m?.message||""}`;
+     if(seen.has(key))return false;seen.add(key);return true;
+   }).sort((a,b)=>{
+     const ta=Number(a?.timestamp||a?.timeStamp||0),tb=Number(b?.timestamp||b?.timeStamp||0);
+     return ta&&tb?ta-tb:0;
+   });
+ }
+ return merged;
+}
 function importBackup(ev){
- const file=ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{try{const x=JSON.parse(reader.result);if(!x||!Array.isArray(x.profiles)||!x.chats||typeof x.chats!=="object")throw new Error("This JSON does not look like a FAKEDATE backup.");data=x;normalizeProfiles();save();await hydrateImages();renderAll();toast("Backup imported successfully")}catch(err){console.error("Backup import failed:",err);toast(err.message||"Could not import this backup file")}};reader.onerror=()=>toast("Could not read the selected backup file");reader.readAsText(file);ev.target.value="";
+ const file=ev.target.files[0];if(!file)return;
+ const reader=new FileReader();
+ reader.onload=async()=>{
+   try{
+     const x=JSON.parse(reader.result);
+     if(!x||!Array.isArray(x.profiles)||!x.chats||typeof x.chats!=="object")throw new Error("This JSON does not look like a FAKEDATE backup.");
+     // Validate and prepare everything before replacing app data, so a bad file cannot wipe current state.
+     const restored=JSON.parse(JSON.stringify(x));
+     const current=JSON.parse(JSON.stringify(data));
+     restored.chats=mergeChatHistories(restored.chats,current.chats);
+     // Preserve current profile conversations even when the imported backup omitted a profile.
+     const restoredIds=new Set(restored.profiles.map(p=>p.id));
+     current.profiles.forEach(p=>{if(!restoredIds.has(p.id)){restored.profiles.push(p);restoredIds.add(p.id)}});
+     restored.matches=[...new Set([...(restored.matches||[]),...(current.matches||[])])];
+     restored.notifications=[...(restored.notifications||[]),...(current.notifications||[])];
+     data=restored;
+     normalizeProfiles();
+     await hydrateImages();
+     save();
+     renderAll();
+     toast("Backup restored; chat history preserved");
+   }catch(err){
+     console.error("Backup import failed:",err);
+     toast(err.message||"Could not import this backup file. Your current data was kept.");
+   }finally{ev.target.value=""}
+ };
+ reader.onerror=()=>{toast("Could not read the selected backup file. Your current data was kept.");ev.target.value=""};
+ reader.readAsText(file);
 }
 async function clearImageDB(){
  try{
