@@ -55,6 +55,21 @@ async function deleteImage(key){
  if(imageCache[key]){URL.revokeObjectURL(imageCache[key]);delete imageCache[key]}
 }
 function normalizeProfiles(){
+ // Keep this simulator to 15 profiles, with at most 25 replies each.
+ data.profiles=data.profiles.slice(0,15);
+ const validProfileIds=new Set(data.profiles.map(p=>p.id));
+ data.matches=data.matches.filter(id=>validProfileIds.has(id));
+ Object.keys(data.chats).forEach(id=>{if(!validProfileIds.has(id))delete data.chats[id]});
+ data.profiles.forEach(p=>{
+   if(!Array.isArray(p.autoReply))p.autoReply=[];
+   p.autoReply=p.autoReply.slice(0,25);
+ });
+ if(!Number.isFinite(Number(data.replyDelayMin)))data.replyDelayMin=0.5;
+ if(!Number.isFinite(Number(data.replyDelayMax)))data.replyDelayMax=5;
+ if(Number(data.replyDelayMin)===3 && Number(data.replyDelayMax)===6){data.replyDelayMin=0.5;data.replyDelayMax=5;}
+ data.replyDelayMin=Math.max(0.5,Math.min(120,Number(data.replyDelayMin)));
+ data.replyDelayMax=Math.max(data.replyDelayMin,Math.min(180,Number(data.replyDelayMax)));
+
  data.profiles.forEach(p=>{
    if(!Array.isArray(p.images))p.images=p.image?[p.image]:["images/alex.svg"];
    p.images=p.images.filter(Boolean).slice(0,4);
@@ -109,8 +124,36 @@ function profile(id){return data.profiles.find(p=>p.id===id)}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function time(){return new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),2200)}
+let notificationAudioContext=null;
+function unlockNotificationSound(){
+ try{
+   const AudioCtx=window.AudioContext||window.webkitAudioContext;
+   if(!AudioCtx)return;
+   if(!notificationAudioContext)notificationAudioContext=new AudioCtx();
+   if(notificationAudioContext.state==="suspended")notificationAudioContext.resume();
+ }catch(e){}
+}
+function playReplySound(){
+ try{
+   const audio=new Audio("audio/reply-notification.mp3");
+   audio.volume=0.85;
+   audio.play().catch(()=>{});
+ }catch(e){}
+}
+document.addEventListener("pointerdown",unlockNotificationSound,{once:true});
+document.addEventListener("keydown",unlockNotificationSound,{once:true});
 function addNotif(text){data.notifications.unshift({id:Date.now()+Math.random(),text,time:time(),read:false});save();renderNotifications();document.getElementById("notifDot").classList.remove("hidden")}
 function chatFor(id){if(!data.chats[id])data.chats[id]=[];return data.chats[id]}
+function unreadCount(id){return chatFor(id).filter(m=>m.from==="them"&&!m.read).length}
+function markChatRead(id){chatFor(id).forEach(m=>{if(m.from==="them")m.read=true});save();renderChats()}
+function updateChatsNavBadge(){
+ const total=data.matches.reduce((sum,id)=>sum+unreadCount(id),0);
+ const nav=document.querySelector('.nav-item[data-view="chatsView"]');
+ if(!nav)return;
+ let badge=nav.querySelector(".nav-unread-count");
+ if(total>0){if(!badge){badge=document.createElement("span");badge.className="nav-unread-count unread-count";badge.setAttribute("aria-label","unread messages");nav.appendChild(badge)}badge.textContent=total>99?"99+":String(total);badge.setAttribute("aria-label",`${total} unread messages`)}
+ else if(badge)badge.remove();
+}
 let swipeState={active:false,startX:0,startY:0,currentX:0,currentY:0,card:null};
 
 function setupSwipe(){
@@ -181,8 +224,9 @@ function renderMatches(){
 function lastMessage(id){const c=chatFor(id);return c.length?c[c.length-1].text:"Start the conversation…"}
 function renderChats(){
  const e=document.getElementById("chatList");
- if(!data.matches.length){e.innerHTML='<div class="empty">Your matched chats will appear here.</div>';return}
- e.innerHTML=data.matches.map(id=>{const p=profile(id);return `<div class="list-item"><img class="avatar" src="${imageSrc(p.images?.[0]||p.image)}"><div class="item-main"><b>${esc(p.name)}</b><span>${esc(lastMessage(id))}</span></div><button class="open-btn" data-chat="${p.id}">Open</button></div>`}).join("");
+ if(!data.matches.length){e.innerHTML='<div class="empty">Your matched chats will appear here.</div>';updateChatsNavBadge();return}
+ e.innerHTML=data.matches.map(id=>{const p=profile(id),unread=unreadCount(id);return `<div class="list-item chat-list-item"><img class="avatar" src="${imageSrc(p.images?.[0]||p.image)}"><div class="item-main"><b>${esc(p.name)}</b><span>${esc(lastMessage(id))}</span></div>${unread?`<span class="unread-count" aria-label="${unread} unread messages">${unread>99?"99+":unread}</span>`:""}<button class="open-btn" data-chat="${p.id}">Open</button></div>`}).join("");
+ updateChatsNavBadge();
 }
 function renderNotifications(){
  const e=document.getElementById("notificationsList");
@@ -191,7 +235,7 @@ function renderNotifications(){
  const unread=data.notifications.some(n=>!n.read);document.getElementById("notifDot").classList.toggle("hidden",!unread);
 }
 function openChat(id){
- activeChat=id;const p=profile(id);document.getElementById("chatModal").classList.remove("hidden");
+ activeChat=id;markChatRead(id);const p=profile(id);document.getElementById("chatModal").classList.remove("hidden");
  document.getElementById("chatHeader").innerHTML=`<img src="${imageSrc(p.images?.[0]||p.image)}"><span>${esc(p.name)}</span>`;
  renderMessages();
 }
@@ -240,23 +284,58 @@ function setupMessageEditing(){
  });
 }
 
-function autoReply(text){
- const p=profile(activeChat),lower=text.toLowerCase();
- let rule=p.autoReply.find(r=>r.keywords.some(k=>lower.includes(k.toLowerCase())));
- const allReplies=p.autoReply.map(r=>r.reply);
- const reply=rule?.reply || allReplies[Math.floor(Math.random()*allReplies.length)];
+function pickChatReply(text, p, rules){
+ const lower=text.toLowerCase();
+ const rule=rules.find(r=>(r.keywords||[]).some(k=>lower.includes(k.toLowerCase())));
+ const pick=list=>list[Math.floor(Math.random()*list.length)];
+ const replies={
+   hello:["Heyyy 😄 Kumusta imong adlaw? Be honest ha, okay ra ka or kinahanglan kag chika?","Hiii! I was going to act mysterious, pero na-excite ko nga ni-message ka 😂","Hello there 👋 Kumusta? Unsay pinaka-random nga nahitabo nimo today?"],
+   romance:["Quick question: are you always this interesting or special edition ra ni para nako? 👀","Are you Wi-Fi? Kay murag na-connect na akong attention nimo. 😭😂","Dili ko maayo mo-pickup line, pero maayo ko mo-ask: when ta mag-coffee? ☕😉","You must be a notification, kay every time you appear, I smile. Corny? Oo. Effective? Maybe. 😂"],
+   jokes:["Dad joke time: Why don't eggs tell jokes? They might crack up. 🥚😂","Ngano dili mag-away ang mga isda? Kay they don't want to make a big splash. 🐟😭","I told my phone I needed space… karon nag-delete siyag photos. Very supportive. 😂","Unsa tawag sa iro nga magician? A labracadabrador. Ayaw ko i-block please. 🐶"],
+   food:["Food question is serious: lechon, sinigang, or pizza? Choose wisely kay this may affect our future. 😂","Gutoma oy. If naa kay pagkaon karon, unsa? Apil ko sa imagination. 😭","I can cook… technically. My specialty is making instant noodles look premium. 🍜"],
+   day:["Okay ra man, pero mas interesting na akong adlaw kay ni-chat ka. Charot lang… unless? 👀","Kapoy gamay, pero laban. Ikaw, unsay highlight sa imong adlaw? Bisag small win lang.","Honestly, medyo chaotic today 😂 Ikaw, peaceful ba imong adlaw or murag teleserye?"],
+   suspense:["Wait lang… naa koy isulti nimo. 😶‍🌫️","Okay, promise dili ni chismis… well, technically chismis ni about me. Ready ka? 😂","Naay something funny nahitabo ganina, pero di ko kabalo if kataw-anan ba or embarrassing. Want to hear it? 👀","I have a tiny confession… pero basin i-judge ko nimo. 😭"],
+   stories:["Mini story: niadto ko sa tindahan para palit tubig, pero pag-abot didto nakalimot ko unsay paliton. Character development: 0. 😂 Ikaw, naa kay funny story?","One time, nag-wave ko sa someone thinking kaila nako. Wala diay. Human sa awkward wave, nag-commit na lang ko ug smile. 😭","Imagine: rainy evening, warm coffee, good music, and someone who laughs at my terrible jokes. Sounds nice, no? ☕🌧️","Plot twist sa akong life karon: nag-open ko sa fridge three times, hoping new food would spawn. 😂"],
+   general:["Hala, interesting lagi na 👀 Tell me more!","Hahaha wait, explain daw kay gusto ko makasabot sa full lore. 😂","Random thought: mas nice ang conversation kung walay pressure, just vibes and a little pagka-weird. 😌","I have a very important question: unsa imong comfort food, and why is it probably the right answer? 😂","Ayaw sa pag-disappear ha, naa pa koy at least three terrible jokes in stock. 😭","You seem fun to talk to. Unsay topic nga maka-chika ka for hours?","Lowkey curious ko nimo. Unsay something about you nga dili obvious sa imong profile? 👀","Sige, your turn: ask me anything—pero ayaw lang about my questionable humor. 😂"]
+ };
+ let category='general';
+ if(/^(hi|hello|hey|hiii|heyy|kumusta)/i.test(lower.trim())) category='hello';
+ else if(/(joke|funny|haha|lol|😂|dad joke)/i.test(lower)) category='jokes';
+ else if(/(food|eat|hungry|dinner|lunch|breakfast|lechon|sinigang|cook)/i.test(lower)) category='food';
+ else if(/(how are you|how's your day|your day|kumusta|kapoy|tired|work)/i.test(lower)) category='day';
+ else if(/(love|date|crush|cute|miss you|handsome|beautiful|single|kiss|heart)/i.test(lower)) category='romance';
+ else if(/(story|tell me|secret|confession|guess what|what happened|chika|tea)/i.test(lower)) category=Math.random()<0.55?'suspense':'stories';
+ else if(Math.random()<0.20) category='stories';
+ else if(Math.random()<0.18) category='suspense';
+ else if(Math.random()<0.20) category='romance';
+ // Keep some profile-specific keyword replies, but mix in more natural playful chat.
+ if(rule && Math.random()<0.38) return rule.reply;
+ return pick(replies[category] || replies.general);
+}
 
- // Simulated reply delay: randomly wait 5–20 minutes.
- // This is intentionally a simulation; the timer runs while the page is open.
- const delayMs=(5*60*1000)+Math.floor(Math.random()*(15*60*1000+1));
+function autoReply(text){
+ const p=profile(activeChat);
+ if(!p)return;
+ const rules=Array.isArray(p.autoReply)?p.autoReply.slice(0,25):[];
+ const reply=pickChatReply(text,p,rules);
+ if(!reply)return;
+
+ // Random delay uses the user's saved settings (default: 30 seconds–5 minutes).
+ // This simulated timer runs while the app page remains open.
+ const minMinutes=Math.max(0.5,Number(data.replyDelayMin)||0.5);
+ const maxMinutes=Math.max(minMinutes,Number(data.replyDelayMax)||5);
+ const delayMs=(minMinutes*60*1000)+Math.floor(Math.random()*((maxMinutes-minMinutes)*60*1000+1));
+ document.getElementById("typing")?.classList.add("hidden");
  const targetId=activeChat;
  setTimeout(()=>{
    const target=profile(targetId);
    if(!target)return;
-   chatFor(targetId).push({from:"them",text:reply,time:time()});
+   const chatIsOpen=activeChat===targetId&&!document.getElementById("chatModal").classList.contains("hidden");
+   chatFor(targetId).push({from:"them",text:reply,time:time(),read:chatIsOpen});
    addNotif(`${target.name} replied to your message`);
+   playReplySound();
    save();
-   if(activeChat===targetId){
+   if(chatIsOpen){
      document.getElementById("typing").classList.add("hidden");
      renderMessages();
    }
@@ -278,9 +357,32 @@ function renderProfilesPanel(){
  document.getElementById("managePanel").classList.remove("hidden");
 }
 function renderRepliesPanel(){
- const phtml=data.profiles.map(p=>`<div class="rule"><b>${esc(p.name)}</b>${p.autoReply.map((r,i)=>`<div style="margin:8px 0;color:#aaa;font-size:13px">Keywords: ${esc(r.keywords.join(", "))}<br>Reply: ${esc(r.reply)} <button class="open-btn" data-edit-reply="${p.id}:${i}" style="margin-top:6px">Edit</button></div>`).join("")}</div>`).join("");
- document.getElementById("managePanel").innerHTML=`<h3>Automatic Replies</h3>${phtml}`;
+ const phtml=data.profiles.map(p=>`<div class="rule"><b>${esc(p.name)}</b>${p.autoReply.slice(0,25).map((r,i)=>`<div style="margin:8px 0;color:#aaa;font-size:13px">Keywords: ${esc(r.keywords.join(", "))}<br>Reply: ${esc(r.reply)} <button class="open-btn" data-edit-reply="${p.id}:${i}" style="margin-top:6px">Edit</button></div>`).join("")}</div>`).join("");
+ document.getElementById("managePanel").innerHTML=`<h3>Automatic Replies</h3>
+ <div class="rule reply-delay-settings">
+   <b>Reply timing</b>
+   <p style="color:#aaa;font-size:13px;margin:6px 0 12px">Replies arrive after a random delay within this range. Default: 30 seconds–5 minutes.</p>
+   <form id="replyDelayForm" class="form">
+     <div class="reply-delay-fields">
+       <label>Minimum delay (minutes)<input name="minDelay" type="number" min="0.5" max="120" step="0.5" value="${Number(data.replyDelayMin)||0.5}" required></label>
+       <label>Maximum delay (minutes)<input name="maxDelay" type="number" min="0.5" max="180" step="0.5" value="${Number(data.replyDelayMax)||5}" required></label>
+     </div>
+     <div class="form-actions"><button class="primary">Save Reply Timing</button></div>
+   </form>
+ </div>${phtml}`;
  document.getElementById("managePanel").classList.remove("hidden");
+ document.getElementById("replyDelayForm").onsubmit=e=>{
+   e.preventDefault();
+   const f=new FormData(e.currentTarget);
+   const min=Number(f.get("minDelay")),max=Number(f.get("maxDelay"));
+   if(!Number.isFinite(min)||!Number.isFinite(max)||min<0.5||max<min||min>120||max>180){
+     toast("Enter a valid range: minimum 0.5–120, maximum at least the minimum and no more than 180 minutes.");
+     return;
+   }
+   data.replyDelayMin=min;data.replyDelayMax=max;save();
+   toast(`Automatic replies will arrive in ${min*60} seconds to ${max} minutes`);
+   renderRepliesPanel();
+ };
 }
 function renderDataPanel(){
  document.getElementById("managePanel").innerHTML=`<h3>Local Data</h3><p style="color:#9295aa">Your profiles, chats and settings are saved in this browser. Backup files stay on your device and are not uploaded to GitHub.</p><div class="form-actions"><button class="primary" id="backupBtn">Download Backup</button><label class="primary" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer">Import Backup<input id="importInput" type="file" accept=".json" hidden></label><button class="danger" id="clearBtn">Clear Everything</button></div>`;
