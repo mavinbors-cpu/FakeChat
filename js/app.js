@@ -639,7 +639,7 @@ async function backup(){
  }catch(e){console.error(e);toast("Backup failed")}
 }
 function importBackup(ev){
- const file=ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{try{const x=JSON.parse(reader.result);if(!x.profiles||!x.chats)throw new Error();data=x;normalizeProfiles();save();await hydrateImages();toast("Backup imported")}catch{toast("Invalid backup file")}};reader.readAsText(file);ev.target.value="";
+ const file=ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{try{const x=JSON.parse(reader.result);if(!x||!Array.isArray(x.profiles)||!x.chats||typeof x.chats!=="object")throw new Error("This JSON does not look like a FAKEDATE backup.");data=x;normalizeProfiles();save();await hydrateImages();renderAll();toast("Backup imported successfully")}catch(err){console.error("Backup import failed:",err);toast(err.message||"Could not import this backup file")}};reader.onerror=()=>toast("Could not read the selected backup file");reader.readAsText(file);ev.target.value="";
 }
 async function clearImageDB(){
  try{
