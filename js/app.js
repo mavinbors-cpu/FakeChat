@@ -268,7 +268,7 @@ function openChat(id){
 }
 function renderMessages(){
  const e=document.getElementById("messages"),c=chatFor(activeChat);
- e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}">${esc(m.text)}${m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time)}</small>${m.from!=="me"?`<button type="button" class="fix-reply-btn" data-fix-reply="${activeChat}" aria-label="Edit automatic reply" title="Edit automatic reply">✎</button>`:""}</div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
+ e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}"><div class="bubble-content">${esc(m.text)}</div>${m.from==="me"&&m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time)}</small><button type="button" class="message-edit-btn" data-edit-chat-message="${i}" aria-label="Edit message" title="Edit message">✎</button></div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
  e.scrollTop=e.scrollHeight;
  setupMessageEditing();
 }
@@ -750,6 +750,24 @@ document.getElementById("messageForm").onsubmit=e=>{e.preventDefault();sendMessa
 
 document.querySelectorAll(".manage-card").forEach(b=>b.onclick=()=>{if(b.dataset.panel==="profiles")renderProfilesPanel();if(b.dataset.panel==="replies")renderRepliesPanel();if(b.dataset.panel==="data")renderDataPanel()});
 document.addEventListener("click",e=>{
+ const editChatMessage=e.target.closest("[data-edit-chat-message]");
+ if(editChatMessage){
+   const index=Number(editChatMessage.dataset.editChatMessage), msg=chatFor(activeChat)[index];
+   if(!msg)return;
+   const bubble=editChatMessage.closest(".bubble");
+   if(bubble.querySelector(".inline-message-editor"))return;
+   const original=msg.text||"";
+   bubble.querySelector(".bubble-content").classList.add("hidden");
+   editChatMessage.classList.add("hidden");
+   const editor=document.createElement("div");editor.className="inline-message-editor";
+   editor.innerHTML=`<textarea aria-label="Edit message text"></textarea><div class="inline-edit-actions"><button type="button" class="inline-cancel">Cancel</button><button type="button" class="inline-save">Save</button></div>`;
+   const ta=editor.querySelector("textarea");ta.value=original;bubble.insertBefore(editor,bubble.querySelector("small"));
+   ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+   editor.querySelector(".inline-cancel").onclick=()=>renderMessages();
+   editor.querySelector(".inline-save").onclick=()=>{const value=ta.value.trim();if(!value){ta.focus();return;}msg.text=value;msg.edited=true;save();renderMessages();renderChats();toast("Message updated");};
+   ta.addEventListener("keydown",ev=>{if((ev.ctrlKey||ev.metaKey)&&ev.key==="Enter")editor.querySelector(".inline-save").click();if(ev.key==="Escape")renderMessages();});
+   return;
+ }
  const fix=e.target.closest("[data-fix-reply]");if(fix){const id=fix.dataset.fixReply;document.getElementById("chatModal").classList.add("hidden");showView("manageView");renderRepliesPanel();const panel=document.getElementById("managePanel");panel.scrollIntoView({behavior:"smooth",block:"start"});toast(`Edit ${profile(id)?.name||"profile"} replies and keywords below`);return}
  const c=e.target.closest("[data-chat]");if(c){openChat(c.dataset.chat);return}
  const ep=e.target.closest("[data-edit-profile]");if(ep){openProfileEditor(ep.dataset.editProfile);return}

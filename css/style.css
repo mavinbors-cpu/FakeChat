@@ -243,3 +243,16 @@ main{
   #chatModal .bubble{max-width:88%;padding:10px 12px}
   #chatModal .message-form{gap:7px;padding-left:9px;padding-right:9px}
 }
+
+/* Low-profile sound control and discreet in-chat message editing */
+.sound-icon-btn{width:30px;height:30px;flex:none;border-radius:50%;background:transparent;border:1px solid transparent;color:#777b8e;font-size:20px;line-height:1;opacity:.42;transition:opacity .15s,color .15s,border-color .15s}
+.sound-icon-btn:hover,.sound-icon-btn:focus-visible{opacity:.9;color:#ffcf45;border-color:#303244;outline:none}
+.message-edit-btn{display:block;margin:4px 0 0 auto;width:18px;height:17px;padding:0;border:0;border-radius:4px;background:transparent;color:inherit;font-size:12px;line-height:17px;opacity:.22;cursor:pointer}
+@media(hover:hover){.message-edit-btn{opacity:0}.bubble:hover .message-edit-btn,.bubble:focus-within .message-edit-btn{opacity:.55}.message-edit-btn:hover{opacity:1!important;color:#ffcf45}}
+@media(hover:none){.message-edit-btn{opacity:.3}}
+.bubble-content{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+.inline-message-editor{width:min(100%,340px);min-width:180px;margin:3px 0 5px}
+.inline-message-editor textarea{display:block;width:100%;min-height:70px;max-height:220px;resize:vertical;background:#10111a;border:1px solid #777b8e;color:#fff;border-radius:9px;padding:8px;font:inherit;line-height:1.35;box-sizing:border-box}
+.inline-edit-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px}
+.inline-edit-actions button{padding:5px 9px;border-radius:7px;font-size:11px;background:#303244;color:#eee}
+.inline-edit-actions .inline-save{background:#ff4f91;color:white}
