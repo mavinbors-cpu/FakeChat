@@ -125,23 +125,46 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 function time(){return new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),2200)}
 let notificationAudioContext=null;
+let replyAudio=null;
+let replyAudioUnlocked=false;
+function getReplyAudio(){
+ if(!replyAudio){
+   replyAudio=new Audio(new URL("audio/reply-notification.mp3",document.baseURI).href);
+   replyAudio.preload="auto";
+   replyAudio.setAttribute("playsinline","");
+   replyAudio.volume=0.85;
+ }
+ return replyAudio;
+}
 function unlockNotificationSound(){
  try{
    const AudioCtx=window.AudioContext||window.webkitAudioContext;
-   if(!AudioCtx)return;
-   if(!notificationAudioContext)notificationAudioContext=new AudioCtx();
-   if(notificationAudioContext.state==="suspended")notificationAudioContext.resume();
+   if(AudioCtx){
+     if(!notificationAudioContext)notificationAudioContext=new AudioCtx();
+     if(notificationAudioContext.state==="suspended")notificationAudioContext.resume().catch(()=>{});
+   }
+   // iOS Safari requires audio playback to be initiated by a user gesture.
+   const audio=getReplyAudio();
+   if(!replyAudioUnlocked){
+     const previousMuted=audio.muted;
+     audio.muted=true;
+     const priming=audio.play();
+     if(priming&&typeof priming.then==="function"){
+       priming.then(()=>{audio.pause();audio.currentTime=0;audio.muted=previousMuted;replyAudioUnlocked=true;}).catch(()=>{audio.muted=previousMuted;});
+     }
+   }
  }catch(e){}
 }
 function playReplySound(){
  try{
-   const audio=new Audio("audio/reply-notification.mp3");
-   audio.volume=0.85;
+   const audio=getReplyAudio();
+   audio.currentTime=0;
+   audio.muted=false;
    audio.play().catch(()=>{});
  }catch(e){}
 }
-document.addEventListener("pointerdown",unlockNotificationSound,{once:true});
-document.addEventListener("keydown",unlockNotificationSound,{once:true});
+document.addEventListener("pointerdown",unlockNotificationSound);
+document.addEventListener("keydown",unlockNotificationSound);
 function addNotif(text){data.notifications.unshift({id:Date.now()+Math.random(),text,time:time(),read:false});save();renderNotifications();document.getElementById("notifDot").classList.remove("hidden")}
 function chatFor(id){if(!data.chats[id])data.chats[id]=[];return data.chats[id]}
 function unreadCount(id){return chatFor(id).filter(m=>m.from==="them"&&!m.read).length}
@@ -241,7 +264,7 @@ function openChat(id){
 }
 function renderMessages(){
  const e=document.getElementById("messages"),c=chatFor(activeChat);
- e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}">${esc(m.text)}${m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time)}</small></div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
+ e.innerHTML=c.length?c.map((m,i)=>`<div class="bubble ${m.from==="me"?"me":"them"}" data-message-index="${i}" data-message-from="${m.from}">${esc(m.text)}${m.edited?'<em class="edited-label">edited</em>':""}<small>${esc(m.time)}</small>${m.from!=="me"?`<button type="button" class="fix-reply-btn" data-fix-reply="${activeChat}" aria-label="Edit automatic reply" title="Edit automatic reply">✎</button>`:""}</div>`).join(""):'<div class="empty">Start the conversation with a message.</div>';
  e.scrollTop=e.scrollHeight;
  setupMessageEditing();
 }
@@ -672,10 +695,13 @@ document.addEventListener("keydown",e=>{
     document.getElementById("chatModal").classList.add("hidden");
   }
 });
-document.getElementById("messageForm").onsubmit=e=>{e.preventDefault();sendMessage()};
+const messageInputEl=document.getElementById("messageInput");
+messageInputEl.addEventListener("input",()=>{messageInputEl.style.height="auto";messageInputEl.style.height=Math.min(messageInputEl.scrollHeight,140)+"px";});
+document.getElementById("messageForm").onsubmit=e=>{e.preventDefault();sendMessage();messageInputEl.style.height="auto"};
 
 document.querySelectorAll(".manage-card").forEach(b=>b.onclick=()=>{if(b.dataset.panel==="profiles")renderProfilesPanel();if(b.dataset.panel==="replies")renderRepliesPanel();if(b.dataset.panel==="data")renderDataPanel()});
 document.addEventListener("click",e=>{
+ const fix=e.target.closest("[data-fix-reply]");if(fix){const id=fix.dataset.fixReply;document.getElementById("chatModal").classList.add("hidden");showView("manageView");renderRepliesPanel();const panel=document.getElementById("managePanel");panel.scrollIntoView({behavior:"smooth",block:"start"});toast(`Edit ${profile(id)?.name||"profile"} replies and keywords below`);return}
  const c=e.target.closest("[data-chat]");if(c){openChat(c.dataset.chat);return}
  const ep=e.target.closest("[data-edit-profile]");if(ep){openProfileEditor(ep.dataset.editProfile);return}
  const er=e.target.closest("[data-edit-reply]");if(er){openReplyEditor(er.dataset.editReply);return}
